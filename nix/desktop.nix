@@ -66,7 +66,7 @@ stdenv.mkDerivation (finalAttrs: {
     ''
     # https://github.com/electron/electron/issues/31121
     # mac builds use a .app bundle which doesnt have this issue
-    + lib.optionalString stdenv.isLinux ''
+    + lib.optionalString stdenv.hostPlatform.isLinux ''
       substituteInPlace \
         packages/desktop/src/main/windows/appearance.ts \
         packages/desktop/src/main/service/desktop-cli.ts \
@@ -91,6 +91,7 @@ stdenv.mkDerivation (finalAttrs: {
     cli_package=$(bun -e 'import { getCurrentCli } from "./scripts/utils.ts"; console.log(getCurrentCli().package.replace("@opencode/", ""))')
     mkdir -p "$OPENCODE_CLI_DIST/$cli_package/bin"
     cp ${lib.getExe opencode} "$OPENCODE_CLI_DIST/$cli_package/bin/opencode"
+    printf '{"version":"%s"}\n' '${opencode.version}' > "$OPENCODE_CLI_DIST/$cli_package/package.json"
 
     bun run build
     npx electron-builder --dir \
@@ -124,9 +125,11 @@ stdenv.mkDerivation (finalAttrs: {
       "$out/share/icons/hicolor/512x512/apps/ai.opencode.desktop.png"
     install -Dm644 resources/ai.opencode.desktop.metainfo.xml \
       "$out/share/metainfo/ai.opencode.desktop.metainfo.xml"
+    # Electron 42's GPU process exits with code 1002 on NixOS when this sandbox is enabled.
     makeWrapper ${lib.getExe electron} $out/bin/opencode-desktop \
      --inherit-argv0 \
      --set ELECTRON_FORCE_IS_PACKAGED 1 \
+     --add-flags --disable-gpu-sandbox \
      --add-flags $out/opt/opencode-desktop/resources/app.asar \
      --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}}"
   ''
